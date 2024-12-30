@@ -65,9 +65,9 @@ def crear_dataframe(precios, lotes):
     })
     return df
 
-def calcular_acumulados(df):
+def calcular_acumulados(df, precio_inicial):
     """
-    Calcula los lotes acumulados, costo acumulado, break-even, flotante y puntos de salida.
+    Calcula los lotes acumulados, costo acumulado, break-even, flotante, puntos de salida y ganancia potencial.
     """
     df['Lotes Acumulados'] = df['Lotes'].cumsum()
     df['Costo Acumulado'] = (df['Precio'] * df['Lotes'] * LOTES_A_UNIDADES).cumsum()
@@ -75,6 +75,8 @@ def calcular_acumulados(df):
     df['Flotante'] = (df['Precio'] - df['Break Even']) * (df['Lotes Acumulados'] * LOTES_A_UNIDADES)
     # Agregar la columna 'Puntos de salida'
     df['Puntos de salida'] = abs(df['Precio'] - df['Break Even'])
+    # Calcular la 'Ganancia Potencial' si el precio regresa al precio inicial
+    df['Ganancia Potencial'] = (precio_inicial - df['Break Even']) * (df['Lotes Acumulados'] * LOTES_A_UNIDADES)
     return df
 
 def validar_precio_final(df, precio_esperado):
@@ -118,8 +120,8 @@ def main():
             # Crear DataFrame
             df = crear_dataframe(precios, lotes)
             
-            # Calcular acumulados
-            df = calcular_acumulados(df)
+            # Calcular acumulados (ahora pasamos 'precio_inicial' como parámetro)
+            df = calcular_acumulados(df, precio_inicial)
             
             # Redondear valores para mejor visualización
             df['Precio'] = df['Precio'].round(2)
@@ -129,6 +131,7 @@ def main():
             df['Break Even'] = df['Break Even'].round(2)
             df['Flotante'] = df['Flotante'].round(2)
             df['Puntos de salida'] = df['Puntos de salida'].round(2)
+            df['Ganancia Potencial'] = df['Ganancia Potencial'].round(2)
             
             # Calcular precio esperado
             precio_esperado = precio_inicial - TOTAL_UNIDADES  # p - 120
@@ -141,13 +144,15 @@ def main():
                 st.write("### Detalles de las Transacciones:")
                 st.dataframe(df)
                 
-                # Mostrar break-even final y flotante total
+                # Mostrar break-even final, flotante total y ganancia potencial final
                 break_even_final = df['Break Even'].iloc[-1]
                 flotante_total = df['Flotante'].iloc[-1]
+                ganancia_potencial_total = df['Ganancia Potencial'].iloc[-1]
                 total_lotes_acumulados = df['Lotes Acumulados'].iloc[-1]
                 
                 st.write(f"### Break-Even Final: {break_even_final:.2f}")
                 st.write(f"### Flotante Total: {flotante_total:.2f}")
+                st.write(f"### Ganancia Potencial Total: {ganancia_potencial_total:.2f}")
                 st.write(f"### Total de Lotes Acumulados: {total_lotes_acumulados:.4f} lotes")
     
 # Ejecutar la aplicación
