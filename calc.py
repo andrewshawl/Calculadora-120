@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np  # Importamos numpy para manejar posibles divisiones por cero
 
 # -------------------------------------------------------------------------
 # CONSTANTES GLOBALES
@@ -67,16 +68,23 @@ def crear_dataframe(precios, lotes):
 
 def calcular_acumulados(df, precio_inicial):
     """
-    Calcula los lotes acumulados, costo acumulado, break-even, flotante, puntos de salida y ganancia potencial.
+    Calcula los lotes acumulados, costo acumulado, break-even, flotante, puntos de salida.
+    También calcula el precio al que debe subir el oro para ganar $5000 desde el precio del nivel actual.
     """
     df['Lotes Acumulados'] = df['Lotes'].cumsum()
     df['Costo Acumulado'] = (df['Precio'] * df['Lotes'] * LOTES_A_UNIDADES).cumsum()
-    df['Break Even'] = df['Costo Acumulado'] / (df['Lotes Acumulados'] * LOTES_A_UNIDADES)
-    df['Flotante'] = (df['Precio'] - df['Break Even']) * (df['Lotes Acumulados'] * LOTES_A_UNIDADES)
+    df['Unidades Acumuladas'] = df['Lotes Acumulados'] * LOTES_A_UNIDADES
+    df['Break Even'] = df['Costo Acumulado'] / df['Unidades Acumuladas']
+    df['Flotante'] = (df['Precio'] - df['Break Even']) * df['Unidades Acumuladas']
     # Agregar la columna 'Puntos de salida'
     df['Puntos de salida'] = abs(df['Precio'] - df['Break Even'])
-    # Calcular la 'Ganancia Potencial' si el precio regresa al precio inicial
-    df['Ganancia Potencial'] = (precio_inicial - df['Break Even']) * (df['Lotes Acumulados'] * LOTES_A_UNIDADES)
+    # Calcular el 'Precio para Ganar $5000' desde el precio del nivel actual
+    df['Precio para Ganar $5000'] = df['Break Even'] + (5000 / df['Unidades Acumuladas'])
+    # Calcular el aumento necesario desde el precio actual para ganar $5000
+    df['Aumento Necesario para $5000'] = df['Precio para Ganar $5000'] - df['Precio']
+    # Reemplazar inf, -inf y NaN en caso de divisiones por cero o acumulación cero
+    df['Precio para Ganar $5000'] = df['Precio para Ganar $5000'].replace([np.inf, -np.inf, np.nan], 0)
+    df['Aumento Necesario para $5000'] = df['Aumento Necesario para $5000'].replace([np.inf, -np.inf, np.nan], 0)
     return df
 
 def validar_precio_final(df, precio_esperado):
@@ -94,14 +102,14 @@ def validar_precio_final(df, precio_esperado):
 # -------------------------------------------------------------------------
 
 def main():
-    st.title("Calculadora")
+    st.title("Calculadora de Distribución en Tramos")
     
     # Entrada del usuario: Precio inicial
     precio_inicial = st.number_input(
         "Precio inicial del oro (p):",
         min_value=1.00,
         value=2700.00,
-        step=5.00,  # Paso ajustado a 5 unidades
+        step=5.00,
         format="%.2f"
     )
     
@@ -120,18 +128,24 @@ def main():
             # Crear DataFrame
             df = crear_dataframe(precios, lotes)
             
-            # Calcular acumulados (ahora pasamos 'precio_inicial' como parámetro)
+            # Calcular acumulados
             df = calcular_acumulados(df, precio_inicial)
             
             # Redondear valores para mejor visualización
             df['Precio'] = df['Precio'].round(2)
-            df['Lotes'] = df['Lotes'].round(4)  # Más decimales para lotajes ajustados
+            df['Lotes'] = df['Lotes'].round(4)
             df['Lotes Acumulados'] = df['Lotes Acumulados'].round(4)
             df['Costo Acumulado'] = df['Costo Acumulado'].round(2)
+            df['Unidades Acumuladas'] = df['Unidades Acumuladas'].round(2)
             df['Break Even'] = df['Break Even'].round(2)
             df['Flotante'] = df['Flotante'].round(2)
             df['Puntos de salida'] = df['Puntos de salida'].round(2)
-            df['Ganancia Potencial'] = df['Ganancia Potencial'].round(2)
+            df['Precio para Ganar $5000'] = df['Precio para Ganar $5000'].round(2)
+            df['Aumento Necesario para $5000'] = df['Aumento Necesario para $5000'].round(2)
+            
+            # Eliminar la columna 'Ganancia Potencial'
+            if 'Ganancia Potencial' in df.columns:
+                df.drop(columns=['Ganancia Potencial'], inplace=True)
             
             # Calcular precio esperado
             precio_esperado = precio_inicial - TOTAL_UNIDADES  # p - 120
@@ -144,17 +158,17 @@ def main():
                 st.write("### Detalles de las Transacciones:")
                 st.dataframe(df)
                 
-                # Mostrar break-even final, flotante total y ganancia potencial final
-                break_even_final = df['Break Even'].iloc[-1]
-                flotante_total = df['Flotante'].iloc[-1]
-                ganancia_potencial_total = df['Ganancia Potencial'].iloc[-1]
-                total_lotes_acumulados = df['Lotes Acumulados'].iloc[-1]
+                # Si no deseas mostrar ningún resumen, podemos comentar o eliminar las siguientes líneas
+                # break_even_final = df['Break Even'].iloc[-1]
+                # flotante_total = df['Flotante'].iloc[-1]
+                # total_lotes_acumulados = df['Lotes Acumulados'].iloc[-1]
                 
-                st.write(f"### Break-Even Final: {break_even_final:.2f}")
-                st.write(f"### Flotante Total: {flotante_total:.2f}")
-                st.write(f"### Ganancia Potencial Total: {ganancia_potencial_total:.2f}")
-                st.write(f"### Total de Lotes Acumulados: {total_lotes_acumulados:.4f} lotes")
-    
+                # st.write(f"### Break-Even Final: {break_even_final:.2f}")
+                # st.write(f"### Flotante Total (Último Precio): {flotante_total:.2f}")
+                # st.write(f"### Total de Lotes Acumulados: {total_lotes_acumulados:.4f} lotes")
+                
+                # En este caso, no mostramos ningún resumen final
+                
 # Ejecutar la aplicación
 if __name__ == "__main__":
     main()
